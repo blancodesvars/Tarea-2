@@ -1,0 +1,179 @@
+---
+title: "Tarea individual 2"
+author: "Entregar el Lunes 16 de Mayo"
+date: "4/5/2018"
+output: pdf_document
+---
+
+title: "Tarea individual 2"
+author: "Entregar el Lunes 16 de Mayo"
+date: "4/5/2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Entrega
+
+La tarea debe ser realizada en RMarkdown en un repositorio de GitHub llamado "Tarea 2".
+La tarea es individual por lo que cada uno tiene que escribir su propia versión de la misma. 
+El repositorio debe contener unicamente el archivo .Rmd con la solución de la tarea.
+
+## Ejercicio 1
+
+Los datos que vamos a utilizar en este ejercicio están disponibles en el catálogo de datos abiertos uruguay https://catalogodatos.gub.uy.
+Los datos que seleccioné son sobre las emisiones de dióxido de carbono (CO2) correspondientes a las actividades de quema de los combustibles en las industrias de la energía y los sectores de consumo. Se incluyen también emisiones de CO2 provenientes de la quema de biomasa y de bunkers internacionales, las cuales se presentan como partidas informativas ya que no se consideran en los totales. En el siguiente link se encuentrán los datos y los meta datos con información que describe la base de datos https://catalogodatos.gub.uy/dataset/emisiones-de-co2-por-sector.
+
+Debe leer con cuidado la información en los meta datos para responder correctamente.
+
+```{r, message=FALSE, warning=FALSE, results='asis', echo=FALSE}
+
+library(tidyverse); library(xtable)
+
+dat <- read.csv("emisiones2.csv", header = TRUE, dec = ",") 
+metadat <- read.csv("metadata_emision.csv", header = TRUE) 
+
+# xtable(metadat[,-2], align = 'ccp{2cm}p{8cm}' )  %>%
+#   print( include.rownames = FALSE)
+
+dato_emision<- gather(dat, key = fuente, value = emision, -Año)
+``` 
+
+Los datos fueron reestructurados para simplificar  la exploración, de la siguente manera:
+
+```{r, message=FALSE, warning=FALSE, results='asis', echo=TRUE, eval=FALSE}
+library(tidyverse)
+dato_emision<- gather(dat, key = fuente, value = emisión, -Año)
+```
+
+Con estos datos responda las sigueintes preguntas:
+
+ 1. Usando las funciones de la librería `dplyr` obtenga qué fuentes tienen la emisión máxima. Recuerde que TOTAL debería ser excluído para esta respuesta así como los subtotales.
+ 
+ ```{r, echo=TRUE}
+library(tidyverse)
+library(dplyr)
+emisiones<- read.csv("emisiones2.csv", header = TRUE, as.is = TRUE)
+new_data<-  select(emisiones,-(S_C:TOTAL))
+new_data<-  select(new_data,-(I_E))
+dato_emision<- gather(new_data, key = fuente, value = emisión, -Año)
+max_data<- dato_emision %>% group_by(fuente) %>% summarise(max=max(emisión, na.rm = TRUE))
+max_data<-arrange(max_data, desc(max))
+head(max_data,1)
+
+```
+
+La quema de biomasa con fines energéticos (leña, residuos de biomasa y carbón vegetal para toda la serie) es la mayor funte emisiora de CO2.
+
+ 2. ¿En qué año se dió la emisión máxima para la fuente que respondió en la pregunta anterior?
+ ```{r, echo=TRUE}
+
+max_year<- dato_emision %>%  arrange(desc(emisión))
+head(max_year,1)
+
+```
+
+3. Usando las funciones de la librería `dplyr` obtenga las 5 fuentes, sin incluir TOTAL ni subtotales, qué tienen un valor medio de emisión a lo largo de todos los años más grandes. 
+```{r, echo=TRUE}
+mean_data<- dato_emision %>% group_by(fuente) %>% summarise(mean=mean(emisión, na.rm = TRUE))
+mean_data<-arrange(mean_data, desc(mean))
+head(mean_data, 5)
+```
+4. Usando ggplot2 realice un gráfico de las emisiones a lo largo de los años para cada fuente. Utilice dos elementos geométricos, puntos y lineas. 
+Selecciones para dibujar solamente las 5 fuentes que a lo largo de los años tienen una emisión media mayor que el resto (respuesta de la pregunta 3).
+Las etiquetas de los ejes deben ser claras y describir las variables involucradas. Incluir un `caption` en la figura con algún comentario de interés que describa el gráfico.
+
+```{r, echo=TRUE}
+
+new_data<-  select(new_data,-(CP:C_S_SP))
+new_data<-  select(emisiones,-(CP:C_S_SP))
+new_data<-  select(new_data,-(A_P_M:TOTAL))
+dato_gg<- gather(new_data, key = fuente, value = emisiones, -Año)
+dato_gg <- dato_gg %>% mutate(fuente = factor(fuente))
+dato_gg$fuente2 <- factor(dato_gg$fuente, labels = c("Búnkers internacionales", "Centrales eléctricas servicio público", "Industrial","Quema de biomas","Transporte"))
+data_plot<-ggplot(dato_gg,aes(x= Año, y= emisiones) ) + geom_point(aes(x= Año, y= emisiones))+ geom_line()+ facet_wrap(~ fuente2, ncol=2)+ labs(x= "Año", y="Emisiones de CO2 en Gg", title= "Serie temporal de emisiones de CO2 segun mayores fuentes de emision")
+data_plot
+
+```
+Figura 1: Gráfico de dispersión de las emisiones de CO2 en Gg contra el tiempo medido en años y dividido de acuerdo a las cinco fuentes de mayor emisión media de CO2 en el periodo 1990-2016.Se puede observar una asociación lineal, positiva y moderada entre la emisione de CO2 en Gg y el tiempo para las fuentes Búnkers internacionales,Industrial y Transporte, mientras que para la Quema de biomasas la relación es más exponencial.
+
+
+5. Relplique el siguiente gráfico usando ggplot2.
+ Incluir un `caption` en la figura con algún comentario de interés que describa el gráfico.
+```{r, echo=TRUE}
+
+ggplot(dato_gg, aes(x =fct_reorder(fuente, emisiones, fun = mean, .desc= TRUE), y = emisiones)) + geom_boxplot()+ labs(x= "Fuentes con mayor emisión media entre 1990 ??? 2016", y="Emisiones de CO2 en Gg", title="Diagrama de caja segun fuentes de emision de CO2 (1990-2016)")
+```
+
+Figura 2: Gráfico de caja de las emisiones de CO2 en Gg de acuerdo a las cinco fuentes de mayor emisión media de CO2 en el periodo 1990-2016.Se puede observar algunos datos atípicos en las Centrales eléctricas servicio público, en la quema de biomasa podemos observar valores mucho más elevados, mientras que en las demás fuentes la distribución es más simétrica.
+
+
+\newpage
+![](box.pdf)
+
+6. Usando la librería ggplot2 y ggpmisc replique el siguiente gráfico de las emisiones totales entre 1990 y 2016.
+Los puntos rojos indican los máximos locales  o picos de emisión de CO2 en Gg. 
+Use `library(help = ggpmisc)` para ver todas las funciones de la librería ggpmisc e identificar cual o cuales necesita para replicar el gráfico.
+Incluir un `caption` en la figura con algún comentario de interés que describa el gráfico.
+```{r, echo=TRUE}
+library(ggpmisc)
+new_data<-  select(emisiones,-(CE_SP:S_C))
+new_data<-  select(new_data,-(Q_B:BI))
+dato_emision<- gather(new_data, key = fuente, value = emisión, -Año)
+ggplot(dato_emision, aes(x=Año, y=emisión))+geom_point()+ geom_line()+ stat_peaks(colour = "red", label.fmt = "%.4g", show.legend = TRUE)+  stat_peaks(geom = "text", colour = "red", vjust = -0.5)+ labs(x= "Año", y="Emisiones de CO2 en Gg", title=" Serie temporal de emision total de CO2 (1990-2016)")
+```
+
+Figura 3: Gráfico de dispersión de las emisiones totales de CO2 en Gg contra el tiempo medido en años durante el periodo 1990-2016, en la cual se destacan los picos de emisión máxima en los años 1992,1999,2008 y 2012.Se puede observar un comportamiento oscilante y casi cíclico con respecto las emisiones totales de   CO2.
+
+## Ejercicio 2
+
+Los datos que vamos a utilizar en este ejercicio están disponibles en el catálogo de datos abiertos uruguay https://catalogodatos.gub.uy.
+
+Los datos que seleccioné son sobre los gastos realizados por actos médicos
+Los datos y los metadatos se encuentran disponibles en:
+
+https://catalogodatos.gub.uy/dataset/gasto_am_2016_fondo-nacional-de-recursos/resource/936ac9e6-b0f6-424a-9b53-ee408a91fd6f
+
+Este ejercicio tiene como objetivo que realice un análisis exploratorio de datos utilizando todo lo aprendido en el curso.
+Debe contener al menos 5 preguntas orientadoras y visualizaciones apropiadas para responderlas. 
+La exploración deberá contener las preguntas a responder sus respuestas con el correspondiente resumen de información o visualización. 
+Incluya en su exploración el análisis de la variabilidad tanto de  variables cuantitativas como cualitativas y covariaciones entre las mismas. 
+Recuerde que en las visualizaciones, las etiquetas de los ejes deben ser claras y describir las variables involucradas. Incluir un `caption` en la figura con algún comentario de interés que describa el gráfico.
+
+1. Se pretende realizar un gráfico que ilustre la relación entre edad y sexo de los pacientes durante el periodo 2016.
+```{r, echo=TRUE}
+gastos<- read.csv("gastosmed.csv", header = TRUE, as.is = TRUE) 
+gastos <- gastos %>% mutate(Sexo = factor(Sexo))
+gastos$Sexo2 <- factor(gastos$Sexo, labels = c( "Femenino","Masculino"))
+gastos %>% ggplot(aes(x = Edad_aÃ.os, fill= Sexo2)) + geom_bar()+  theme(axis.text.x = element_text(angle = 90))+  labs(y = "Frecuencia", x = "Edad" , title= "Grafico de barras de edad de los pacientes por sexo")+ facet_wrap(~Sexo2)+ guides(fill=FALSE)
+```
+Figura 4. Gráfico de barras de la frecuencia de pacientes atendidos según edad y divididos por sexo. Ambos grupos presentan un distribución similar y casi normal, la frecuencia de mujeres de entre 30-35 años es mayor que la de los hombre al contrario de lo que ocurre en el grupo de entre 60-90 años en la que la cantidad de hombres es bastante mayor,este resultado se debe posiblemente a aspectos culturales.
+
+
+2. Se desea definir los 3 servicios que en los cuales se gastó el mayor importe
+durante el perdiodo 2016.
+```{r, echo=TRUE}
+new_data<- select(gastos,-(Paciente:Prestador_departamento))
+max_data<- new_data %>% group_by(Prestacion) %>% summarise(sum=sum(Importe, na.rm = TRUE))
+max_data<-arrange(max_data,desc(sum))
+head(max_data,3)
+
+
+```
+
+3.Comparar el tipo de prestadores de salud de aquellos pacientes que acuden al Departamento de Montevideo para recibir atencion medica residiendo fuera del mismo.
+
+```{r, echo= TRUE}
+gastos <- gastos %>% mutate( Prestador_tipo= factor(Prestador_tipo))
+gastos$Prestador_tipo2 <- factor(gastos$Prestador_tipo, labels = c("Administración de los Servicios de Salud del Estado","Instituciones de asistencia médica colectiva","Otro", "Seguro Pribado"))
+ y <- filter(gastos, Departamento_residencia != "MONTEVIDEO")
+x<- filter(y, Prestador_departamento== "MONTEVIDEO")
+ggplot(x, aes(x= Prestador_tipo2, fill=Prestador_tipo))+ geom_bar()+ guides(fill=FALSE)+ labs( x= NULL, y=NULL, title= "Grafico de barras de tipo de prestador de salud ")+ theme(axis.text.x = element_text(angle = 90))+ coord_flip()
+
+```
+
+Figura 5. Grafico de barras de tipo de prestadores de salud de aquellos pacientes no residentes del Departamento de Montevideo cuyos prestadores de salud si. Se observa que el nivel predominante es el  de las instituciones de asistencia medica colectiva.
+
